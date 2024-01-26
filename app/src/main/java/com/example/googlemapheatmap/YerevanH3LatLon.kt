@@ -1,13 +1,17 @@
 package com.example.googlemapheatmap
 
-import android.graphics.Color
 import com.google.android.gms.maps.model.LatLng
 
-class YerevanH3LatLon {
-    var corner = mutableListOf<Corner>()
 
+data class Corner(val coordinates: List<LatLng>? = null,var id:Int =-1,var tariff:Int=0,var color:Int=0 )
+
+class YerevanH3LatLon {
+
+        var corner = mutableListOf<Corner>()
 
     init {
+
+        //assume we will get this from Server end with its id and tariff and etc...
         corner.addAll(
             listOf(
                 Corner(
@@ -216,6 +220,5 @@ class YerevanH3LatLon {
     }
 }
 
-data class Corner(val coordinates: List<LatLng>? = null, var opacity: Int =0, var color: Int =Color.BLUE )
 
 

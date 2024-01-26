@@ -1,60 +1,46 @@
 package com.example.googlemapheatmap
 
+
 import android.Manifest
 import android.app.AlertDialog
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.RadialGradient
-import android.graphics.Shader
-import android.graphics.drawable.Drawable
-import android.graphics.drawable.ShapeDrawable
-import android.graphics.drawable.shapes.OvalShape
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import com.example.googlemapheatmap.adapters.TariffInformationAdapter
 import com.example.googlemapheatmap.databinding.ActivityMapsBinding
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.maps.CameraUpdateFactory
+import com.example.googlemapheatmap.utills.CustomMarkerUtils
 import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.GoogleMap.OnPolygonClickListener
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
-import com.google.android.gms.maps.model.Polyline
-import com.google.android.gms.maps.model.PolylineOptions
-import com.google.android.gms.maps.model.TileOverlay
-import com.google.android.gms.maps.model.TileOverlayOptions
-import com.google.android.gms.maps.model.TileProvider
-import com.google.maps.android.heatmaps.HeatmapTileProvider
-import com.google.maps.android.heatmaps.WeightedLatLng
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
-
-
+import com.google.android.gms.maps.model.Polygon
 import kotlin.random.Random
 
 
-class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
+class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickListener{
 
     private lateinit var mMap: GoogleMap
-
+    private lateinit var tariffInfoView: TariffInformationAdapter
     private lateinit var binding: ActivityMapsBinding
 
-    private var hexagonDrawer : HexagonDrawer?=null
+    private var hexagonDrawer: HexagonDrawer? = null
+
+    private val hex = YerevanH3LatLon()
+
+    private var previousMarker:Marker?=null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         binding = ActivityMapsBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
+        tariffInfoView = TariffInformationAdapter(this)
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
@@ -67,13 +53,14 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             )
         )
     }
+
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
-        hexagonDrawer=HexagonDrawer(googleMap)
+        hexagonDrawer = HexagonDrawer(googleMap)
         addMyLocationButton()
         drawAllHexagons()
+        googleMap.setOnPolygonClickListener(this)
     }
-
 
     private fun addMyLocationButton() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
@@ -85,8 +72,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         } else {
             showPermissionDialog()
         }
-
-
     }
 
     private fun showPermissionDialog() {
@@ -101,7 +86,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     Manifest.permission.ACCESS_COARSE_LOCATION
                 )
             )
-
         }
         alertDialogBuilder.setNegativeButton("No") { dialog, _ ->
             finish()
@@ -112,7 +96,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         alertDialog.show()
     }
 
-
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -120,32 +103,73 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
                 addMyLocationButton()
             }
-
             permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
                 // Only approximate location access granted.
             }
-
             else -> {
                 showPermissionDialog()
             }
         }
     }
 
-
     private fun drawAllHexagons() {
-        val hex=YerevanH3LatLon()
-        for (list in hex.corner) {
-            list.coordinates?.let { drawHexagon(it) }
+        for ((id, list) in hex.corner.withIndex()) {
+            drawHexagon(list, id)
+
         }
     }
 
+    private fun drawHexagon(corner: Corner, id: Int) {
+        corner.id = id
+        corner.tariff = Random.nextInt(8, 25)*100
+        corner.color=getPolygonColor(tariff =corner.tariff )
+        val alpha = 70
+        hexagonDrawer?.drawGradientHexagon(corner, alpha)
+    }
 
-    private fun drawHexagon(hexagonCoordinates:List<LatLng>) {
-        val startColor = Color.BLUE
-        val endColor = Color.RED
-        val hexagonStartAlpha = 50
-        val hexagonEndAlpha = 0
-        hexagonDrawer?.drawGradientHexagon(hexagonCoordinates,startColor,endColor,hexagonStartAlpha,hexagonEndAlpha)
+    private fun getPolygonColor(tariff: Int): Int {
+        return if(tariff<1200){
+            Color.BLUE
+        } else if(tariff in 1200..1899){
+            Color.GREEN
+        } else
+            Color.RED
+    }
+
+    private fun calculateCentroid(points: List<LatLng>): LatLng {
+        var xSum = 0.0
+        var ySum = 0.0
+        for (point in points) {
+            xSum += point.latitude
+            ySum += point.longitude
+        }
+        val centerX = xSum / points.size
+        val centerY = ySum / points.size
+        return LatLng(centerX, centerY)
+    }
+
+    override fun onPolygonClick(clickPolygon: Polygon) {
+        previousMarker?.remove()
+        var tariff = 0
+        for ((polygon, tag) in HexagonDrawer.hexagons) {
+            if (clickPolygon == polygon) {
+
+                for (corner in hex.corner) {
+                    if (corner.id == tag)
+                        tariff = corner.tariff
+                }
+            }
+        }
+        val customMarkerIcon = CustomMarkerUtils.getCustomMarkerIcon(this,tariff)
+        val markerOptions = MarkerOptions()
+            .position(calculateCentroid(clickPolygon.points))
+            .alpha(.8F)
+            .icon(customMarkerIcon)
+        val marker = mMap.addMarker(markerOptions)
+        marker?.showInfoWindow()
+
+        previousMarker=marker
+
 
     }
 }
