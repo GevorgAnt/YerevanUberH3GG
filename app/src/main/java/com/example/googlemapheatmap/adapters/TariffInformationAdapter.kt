@@ -12,18 +12,12 @@ class TariffInformationAdapter(private val context: Context ) : GoogleMap.InfoWi
 
     private var binding:InformationTariffViewBinding?=null
     override fun getInfoWindow(marker: Marker): View? {
-        // Return null to use the default info window
         return null
     }
 
     override fun getInfoContents(marker: Marker): View {
-        // Inflate your custom info window layout
         binding=InformationTariffViewBinding.inflate(LayoutInflater.from(context))
-
-        // Customize the content of the info window
         val markerInfo = marker.tag
-
-        // Customize the content based on your requirements
         if (markerInfo != null) {
             binding!!.tariffTextview.text = "start tariff for this place is $markerInfo"
         } else {

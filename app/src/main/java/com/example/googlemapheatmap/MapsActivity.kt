@@ -2,6 +2,8 @@ package com.example.googlemapheatmap
 
 
 import android.Manifest
+import android.animation.ObjectAnimator
+import android.animation.TypeEvaluator
 import android.app.AlertDialog
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -23,7 +25,7 @@ import com.google.android.gms.maps.model.Polygon
 import kotlin.random.Random
 
 
-class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickListener{
+class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickListener {
 
     private lateinit var mMap: GoogleMap
     private lateinit var tariffInfoView: TariffInformationAdapter
@@ -33,7 +35,9 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickList
 
     private val hex = YerevanH3LatLon()
 
-    private var previousMarker:Marker?=null
+    private var firtpos = true
+    private var previousMarker: Marker? = null
+    private var previousMarkerPos: LatLng? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -115,22 +119,21 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickList
     private fun drawAllHexagons() {
         for ((id, list) in hex.corner.withIndex()) {
             drawHexagon(list, id)
-
         }
     }
 
     private fun drawHexagon(corner: Corner, id: Int) {
         corner.id = id
-        corner.tariff = Random.nextInt(8, 25)*100
-        corner.color=getPolygonColor(tariff =corner.tariff )
+        corner.tariff = Random.nextInt(8, 25) * 100
+        corner.color = getPolygonColor(tariff = corner.tariff)
         val alpha = 70
         hexagonDrawer?.drawGradientHexagon(corner, alpha)
     }
 
     private fun getPolygonColor(tariff: Int): Int {
-        return if(tariff<1200){
+        return if (tariff < 1200) {
             Color.BLUE
-        } else if(tariff in 1200..1899){
+        } else if (tariff in 1200..1899) {
             Color.GREEN
         } else
             Color.RED
@@ -148,29 +151,49 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickList
         return LatLng(centerX, centerY)
     }
 
-    override fun onPolygonClick(clickPolygon: Polygon) {
+    private fun animateMarkerToPosition(targetPosition: LatLng, currentPosition: LatLng, markerOptions: MarkerOptions) {
+       val marker= mMap.addMarker(markerOptions)
         previousMarker?.remove()
+        val animator = ObjectAnimator.ofObject(
+            marker,
+            "position",
+            LatLngEvaluator(),
+            currentPosition,
+            targetPosition,
+        )
+        animator.duration = 300
+        animator.start()
+        previousMarker=marker
+    }
+
+    override fun onPolygonClick(clickPolygon: Polygon) {
+        if (firtpos) {
+            previousMarkerPos = calculateCentroid(clickPolygon.points)
+            firtpos=false
+        }
         var tariff = 0
         for ((polygon, tag) in HexagonDrawer.hexagons) {
             if (clickPolygon == polygon) {
-
                 for (corner in hex.corner) {
                     if (corner.id == tag)
                         tariff = corner.tariff
                 }
             }
         }
-        val customMarkerIcon = CustomMarkerUtils.getCustomMarkerIcon(this,tariff)
+        val customMarkerIcon = CustomMarkerUtils.getCustomMarkerIcon(this, tariff)
         val markerOptions = MarkerOptions()
             .position(calculateCentroid(clickPolygon.points))
             .alpha(.8F)
             .icon(customMarkerIcon)
-        val marker = mMap.addMarker(markerOptions)
-        marker?.showInfoWindow()
-
-        previousMarker=marker
-
-
+        animateMarkerToPosition(calculateCentroid(clickPolygon.points), previousMarkerPos!!, markerOptions)
+        previousMarkerPos = markerOptions.position
+    }
+    private inner class LatLngEvaluator : TypeEvaluator<LatLng> {
+        override fun evaluate(fraction: Float, startValue: LatLng, endValue: LatLng): LatLng {
+            val lat = (endValue.latitude - startValue.latitude) * fraction + startValue.latitude
+            val lng = (endValue.longitude - startValue.longitude) * fraction + startValue.longitude
+            return LatLng(lat, lng)
+        }
     }
 }
 

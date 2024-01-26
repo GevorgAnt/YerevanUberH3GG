@@ -10,7 +10,6 @@ class HexagonDrawer(private val googleMap: GoogleMap) {
 
     companion object {
         val hexagons: MutableList<Pair<Polygon, Int>> = mutableListOf()
-
     }
     fun drawGradientHexagon(corner: Corner, alpha: Int) {
         val polygonOptions = PolygonOptions()
