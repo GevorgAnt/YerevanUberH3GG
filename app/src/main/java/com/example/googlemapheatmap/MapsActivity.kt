@@ -5,18 +5,22 @@ import android.Manifest
 import android.animation.ObjectAnimator
 import android.animation.TypeEvaluator
 import android.app.AlertDialog
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.example.googlemapheatmap.adapters.TariffInformationAdapter
 import com.example.googlemapheatmap.databinding.ActivityMapsBinding
 import com.example.googlemapheatmap.h3UberHexagon.Corner
 import com.example.googlemapheatmap.h3UberHexagon.HexagonDrawer
 import com.example.googlemapheatmap.h3UberHexagon.YerevanH3LatLon
 import com.example.googlemapheatmap.utills.CustomMarkerUtils
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.GoogleMap.OnMarkerClickListener
@@ -35,7 +39,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickList
     private lateinit var mMap: GoogleMap
     private lateinit var tariffInfoView: TariffInformationAdapter
     private lateinit var binding: ActivityMapsBinding
-
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
     private var hexagonDrawer: HexagonDrawer? = null
 
     private val hex = YerevanH3LatLon()
@@ -50,6 +54,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickList
         binding = ActivityMapsBinding.inflate(layoutInflater)
         setContentView(binding.root)
         tariffInfoView = TariffInformationAdapter(this)
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
@@ -67,12 +72,26 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickList
         mMap = googleMap
 
         hexagonDrawer = HexagonDrawer(googleMap)
-        val myHexagonGridLatLon=LatLng(40.1566473705146, 44.48573407713859)
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(myHexagonGridLatLon, 14F))
-        addMyLocationButton()
+        moveCameraToCurrentLocation()
         drawAllHexagons()
         googleMap.setOnPolygonClickListener(this)
         googleMap.setOnMarkerClickListener(this)
+    }
+
+    private fun moveCameraToCurrentLocation() {
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { location ->
+                    if (location != null) {
+                        val currentLatLng = LatLng(location.latitude, location.longitude)
+                        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 14f))
+                    }
+                }
+        }
     }
 
     private fun addMyLocationButton() {
@@ -91,14 +110,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickList
         val alertDialogBuilder = AlertDialog.Builder(this)
         alertDialogBuilder.setTitle("Location Permission")
         alertDialogBuilder.setMessage("This app needs location permission to function properly. Grant permission now?")
-        alertDialogBuilder.setPositiveButton("Yes") { _, _ ->
+        alertDialogBuilder.setPositiveButton("Yes") { dialog, _ ->
             // User clicked Yes
-            locationPermissionRequest.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
+            openAppSettings()
+            addMyLocationButton()
+            dialog.dismiss()
         }
         alertDialogBuilder.setNegativeButton("No") { dialog, _ ->
             finish()
@@ -119,6 +135,16 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickList
             else -> {
                 showPermissionDialog()
             }
+        }
+    }
+    private fun openAppSettings() {
+        val intent = Intent()
+        intent.action = android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+        intent.data = android.net.Uri.fromParts("package", packageName, null)
+
+        // Check if the intent can be resolved
+        if (intent.resolveActivity(packageManager) != null) {
+            startActivity(intent)
         }
     }
 
