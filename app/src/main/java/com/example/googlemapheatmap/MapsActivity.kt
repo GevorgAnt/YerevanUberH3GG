@@ -13,8 +13,13 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.example.googlemapheatmap.adapters.TariffInformationAdapter
 import com.example.googlemapheatmap.databinding.ActivityMapsBinding
+import com.example.googlemapheatmap.h3UberHexagon.Corner
+import com.example.googlemapheatmap.h3UberHexagon.HexagonDrawer
+import com.example.googlemapheatmap.h3UberHexagon.YerevanH3LatLon
 import com.example.googlemapheatmap.utills.CustomMarkerUtils
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.GoogleMap.OnMarkerClickListener
 import com.google.android.gms.maps.GoogleMap.OnPolygonClickListener
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
@@ -25,7 +30,7 @@ import com.google.android.gms.maps.model.Polygon
 import kotlin.random.Random
 
 
-class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickListener {
+class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickListener,OnMarkerClickListener {
 
     private lateinit var mMap: GoogleMap
     private lateinit var tariffInfoView: TariffInformationAdapter
@@ -35,7 +40,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickList
 
     private val hex = YerevanH3LatLon()
 
-    private var firtpos = true
+    private var firstpos = true
     private var previousMarker: Marker? = null
     private var previousMarkerPos: LatLng? = null
 
@@ -60,10 +65,14 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickList
 
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
+
         hexagonDrawer = HexagonDrawer(googleMap)
+        val myHexagonGridLatLon=LatLng(40.1566473705146, 44.48573407713859)
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(myHexagonGridLatLon, 14F))
         addMyLocationButton()
         drawAllHexagons()
         googleMap.setOnPolygonClickListener(this)
+        googleMap.setOnMarkerClickListener(this)
     }
 
     private fun addMyLocationButton() {
@@ -107,9 +116,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickList
             permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
                 addMyLocationButton()
             }
-            permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
-                // Only approximate location access granted.
-            }
             else -> {
                 showPermissionDialog()
             }
@@ -126,7 +132,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickList
         corner.id = id
         corner.tariff = Random.nextInt(8, 25) * 100
         corner.color = getPolygonColor(tariff = corner.tariff)
-        val alpha = 70
+        val alpha = 60
         hexagonDrawer?.drawGradientHexagon(corner, alpha)
     }
 
@@ -167,9 +173,9 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickList
     }
 
     override fun onPolygonClick(clickPolygon: Polygon) {
-        if (firtpos) {
+        if (firstpos) {
             previousMarkerPos = calculateCentroid(clickPolygon.points)
-            firtpos=false
+            firstpos=false
         }
         var tariff = 0
         for ((polygon, tag) in HexagonDrawer.hexagons) {
@@ -188,12 +194,20 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, OnPolygonClickList
         animateMarkerToPosition(calculateCentroid(clickPolygon.points), previousMarkerPos!!, markerOptions)
         previousMarkerPos = markerOptions.position
     }
+
     private inner class LatLngEvaluator : TypeEvaluator<LatLng> {
         override fun evaluate(fraction: Float, startValue: LatLng, endValue: LatLng): LatLng {
             val lat = (endValue.latitude - startValue.latitude) * fraction + startValue.latitude
             val lng = (endValue.longitude - startValue.longitude) * fraction + startValue.longitude
             return LatLng(lat, lng)
         }
+    }
+
+    override fun onMarkerClick(marker: Marker): Boolean {
+       previousMarker?.remove()
+        firstpos=true
+        marker.remove()
+        return false
     }
 }
 

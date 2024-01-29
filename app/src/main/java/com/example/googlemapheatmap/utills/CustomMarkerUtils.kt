@@ -15,11 +15,9 @@ object CustomMarkerUtils {
     fun getCustomMarkerIcon(context: Context,markerText:Int): BitmapDescriptor {
         val customMarkerView = LayoutInflater.from(context).inflate(R.layout.information_tariff_view, null)
         val textView = customMarkerView.findViewById<TextView>(R.id.tariff_textview)
-        "start tariff for this place is \n $markerText Դ".also { textView.text = it }
+        "start tariff for this place is \n $markerText Դ".also { textView.text = it } //senc android studiona sarqel
         val bitmap = createBitmapFromView(customMarkerView)
         return BitmapDescriptorFactory.fromBitmap(bitmap)
-
-
     }
 
     private fun createBitmapFromView(view: View): Bitmap {

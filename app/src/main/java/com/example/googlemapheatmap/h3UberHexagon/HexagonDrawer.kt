@@ -1,4 +1,4 @@
-package com.example.googlemapheatmap
+package com.example.googlemapheatmap.h3UberHexagon
 
 import android.graphics.Color
 import com.google.android.gms.maps.GoogleMap
@@ -11,11 +11,12 @@ class HexagonDrawer(private val googleMap: GoogleMap) {
     companion object {
         val hexagons: MutableList<Pair<Polygon, Int>> = mutableListOf()
     }
+
     fun drawGradientHexagon(corner: Corner, alpha: Int) {
         val polygonOptions = PolygonOptions()
             .addAll(corner.coordinates!!)
-            .strokeColor(Color.BLACK)
-            .strokeWidth(5f)  // Adjust the stroke width as needed
+            .strokeColor(corner.color)
+            .strokeWidth(2f)  // Adjust the stroke width as needed
             .fillColor(Color.argb(alpha, Color.red(corner.color), Color.green(corner.color), Color.blue(corner.color)))
             .clickable(true)
         val hexagon = googleMap.addPolygon(polygonOptions)

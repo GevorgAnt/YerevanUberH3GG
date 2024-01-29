@@ -1,4 +1,4 @@
-package com.example.googlemapheatmap
+package com.example.googlemapheatmap.h3UberHexagon
 
 import com.google.android.gms.maps.model.LatLng
 
